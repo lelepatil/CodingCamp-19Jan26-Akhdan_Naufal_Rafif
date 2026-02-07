@@ -1,157 +1,87 @@
-const todoForm = document.getElementById('todoForm');
-const todoInput = document.getElementById('todoInput');
-const dateInput = document.getElementById('dateInput');
-const todoList = document.getElementById('todoList');
-const emptyState = document.getElementById('emptyState');
-const filterBtns = document.querySelectorAll('.filter-btn');
+document.addEventListener('DOMContentLoaded', () => {
+   
+    const todoForm = document.getElementById('todoForm');
+    const todoInput = document.getElementById('todoInput');
+    const dateInput = document.getElementById('dateInput');
+    const todoList = document.getElementById('todoList');
+    const emptyState = document.getElementById('emptyState');
+    const filterBtns = document.querySelectorAll('.filter-btn');
 
-let todos = JSON.parse(localStorage.getItem('todos')) || [];
-let currentFilter = 'all';
+    let tasks = [];
 
-dateInput.min = new Date().toISOString().split('T')[0];
+    
+    function renderTasks(filter = 'all') {
+        todoList.innerHTML = '';
+        
+        let filteredTasks = tasks;
+        if (filter === 'active') filteredTasks = tasks.filter(t => !t.completed);
+        if (filter === 'completed') filteredTasks = tasks.filter(t => t.completed);
 
-todoForm.addEventListener('submit', addTodo);
+        if (filteredTasks.length === 0) {
+            emptyState.classList.remove('hidden');
+        } else {
+            emptyState.classList.add('hidden');
+            filteredTasks.forEach(task => {
+                const item = document.createElement('div');
+                item.className = `flex items-center justify-between p-4 border-2 rounded-xl transition-all ${task.completed ? 'bg-gray-50 border-gray-100 opacity-60' : 'bg-white border-purple-100 shadow-sm'}`;
+                item.innerHTML = `
+                    <div class="flex flex-col">
+                        <span class="font-bold text-lg ${task.completed ? 'line-through text-gray-400' : 'text-gray-800'}">${task.text}</span>
+                        <span class="text-xs text-gray-500">Deadline: ${task.date}</span>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="toggleStatus(${task.id})" class="px-3 py-1 text-xs font-bold rounded-lg border-2 ${task.completed ? 'border-green-500 text-green-600' : 'border-amber-500 text-amber-600'}">
+                            ${task.completed ? 'SELESAI' : 'BELUM SELESAI'}
+                        </button>
+                        <button onclick="deleteTask(${task.id})" class="text-red-500 hover:text-red-700 font-bold p-1">X</button>
+                    </div>
+                `;
+                todoList.appendChild(item);
+            });
+        }
+    }
 
-filterBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-        filterBtns.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        currentFilter = btn.dataset.filter;
-        renderTodos();
+   
+    todoForm.addEventListener('submit', (e) => {
+        e.preventDefault(); 
+        
+        const taskText = todoInput.value.trim();
+        const dueDate = dateInput.value;
+
+        if (taskText && dueDate) {
+            tasks.push({
+                id: Date.now(),
+                text: taskText,
+                date: dueDate,
+                completed: false
+            });
+            todoInput.value = '';
+            dateInput.value = '';
+            renderTasks();
+        }
     });
-});
 
-function addTodo(e) {
-    e.preventDefault();
+    
+    filterBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            filterBtns.forEach(b => b.classList.remove('border-purple-600', 'text-purple-600'));
+            btn.classList.add('border-purple-600', 'text-purple-600');
+            renderTasks(btn.dataset.filter);
+        });
+    });
 
-    const todoText = todoInput.value.trim();
-    const todoDate = dateInput.value;
-
-    if (!todoText) {
-        alert('Please enter a task!');
-        return;
-    }
-
-    if (!todoDate) {
-        alert('Please select a date!');
-        return;
-    }
-
-    // Create todo object
-    const todo = {
-        id: Date.now(),
-        text: todoText,
-        date: todoDate,
-        completed: false,
-        createdAt: new Date().toISOString()
+    
+    window.toggleStatus = (id) => {
+        tasks = tasks.map(t => t.id === id ? {...t, completed: !t.completed} : t);
+        renderTasks();
     };
 
-    todos.push(todo);
-
-    saveTodos();
-
-    todoInput.value = '';
-    dateInput.value = '';
-
-    renderTodos();
-
-    todoInput.focus();
-}
-
-function deleteTodo(id) {
-    if (confirm('Are you sure you want to delete this task?')) {
-        todos = todos.filter(todo => todo.id !== id);
-        saveTodos();
-        renderTodos();
-    }
-}
-
-function toggleComplete(id) {
-    todos = todos.map(todo => {
-        if (todo.id === id) {
-            return { ...todo, completed: !todo.completed };
+    window.deleteTask = (id) => {
+        if(confirm('Hapus tugas ini?')) {
+            tasks = tasks.filter(t => t.id !== id);
+            renderTasks();
         }
-        return todo;
-    });
-    saveTodos();
-    renderTodos();
-}
+    };
 
-function filterTodos() {
-    switch (currentFilter) {
-        case 'active':
-            return todos.filter(todo => !todo.completed);
-        case 'completed':
-            return todos.filter(todo => todo.completed);
-        default:
-            return todos;
-    }
-}
-
-function renderTodos() {
-    const filteredTodos = filterTodos();
-
-    todoList.innerHTML = '';
-
-    if (filteredTodos.length === 0) {
-        emptyState.classList.remove('hidden');
-        todoList.classList.add('hidden');
-    } else {
-        emptyState.classList.add('hidden');
-        todoList.classList.remove('hidden');
-    }
-
-    filteredTodos.forEach(todo => {
-        const todoItem = createTodoElement(todo);
-        todoList.appendChild(todoItem);
-    });
-}
-
-function createTodoElement(todo) {
-    const todoItem = document.createElement('div');
-    todoItem.className = `todo-item bg-gray-100 p-5 rounded-xl flex items-center gap-4 transition-all duration-300 hover:bg-gray-200 hover:translate-x-1 ${todo.completed ? 'opacity-60' : ''}`;
-    todoItem.dataset.id = todo.id;
-
-    const formattedDate = formatDate(todo.date);
-
-    todoItem.innerHTML = `
-        <div class="flex-shrink-0">
-            <input 
-                type="checkbox" 
-                class="w-6 h-6 cursor-pointer accent-purple-600" 
-                ${todo.completed ? 'checked' : ''}
-                onchange="toggleComplete(${todo.id})"
-            >
-        </div>
-        <div class="flex-1 min-w-0">
-            <div class="text-lg text-gray-800 break-words ${todo.completed ? 'line-through text-gray-500' : ''}">${escapeHtml(todo.text)}</div>
-            <div class="text-sm text-gray-600 mt-1">📅 ${formattedDate}</div>
-        </div>
-        <button 
-            class="flex-shrink-0 bg-red-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-red-600 hover:scale-105 active:scale-95 transition-all duration-200 text-sm"
-            onclick="deleteTodo(${todo.id})"
-        >
-            Delete
-        </button>
-    `;
-
-    return todoItem;
-}
-
-function formatDate(dateString) {
-    const date = new Date(dateString);
-    const options = { year: 'numeric', month: 'short', day: 'numeric' };
-    return date.toLocaleDateString('en-US', options);
-}
-
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-function saveTodos() {
-    localStorage.setItem('todos', JSON.stringify(todos));
-}
-
-renderTodos();
+    renderTasks(); 
+});
